@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BOLBALL - Sınırsız Özgürlük v3.0</title>
+    <style>
+        :root {
+            --primary-glow: #00ffcc;
+            --glass-bg: rgba(15, 15, 20, 0.7);
+            --glass-border: rgba(0, 255, 204, 0.3);
+            --text-color: #fff;
+        }
+
+    body, html { 
+        margin: 0; padding: 0; width: 100%; height: 100%; 
+        background-color: #050505; color: var(--text-color); 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        overflow: hidden; user-select: none; -webkit-user-select: none;
+    }
+    
+    #gameContainer { 
+        position: relative; width: 100%; max-width: 600px; height: 100%; 
+        margin: 0 auto; box-shadow: 0 0 50px rgba(0,0,0,1); 
+        background-size: cover; background-position: center;
+        overflow: hidden; transition: background 0.6s ease;
+    }
+    
+    canvas { display: block; width: 100%; height: 100%; z-index: 1; touch-action: none; }
+
+    .screen { 
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+        display: none; flex-direction: column; align-items: center; justify-content: center; 
+        z-index: 10; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); 
+        background: rgba(0,0,0,0.6);
+    }
+    .screen.active { display: flex; animation: fadeIn 0.4s cubic-bezier(0.1, 0.8, 0.2, 1); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+    /* Giriş ekranındaki yuvarlak görsel ve içindeki parlayan top */
+    .hero-visual {
+        position: relative; width: 130px; height: 130px; margin-bottom: 5px;
+        background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        animation: pulseGlow 2s infinite alternate;
+    }
+    .hero-visual::before { 
+        content: ""; 
+        width: 55px; height: 55px; 
+        background: radial-gradient(circle at 30% 30%, #ffffff 0%, var(--primary-glow) 65%, #005544 100%);
+        border-radius: 50%;
+        box-shadow: 0 0 25px var(--primary-glow), inset -4px -4px 10px rgba(0,0,0,0.6);
+    }
+    .hero-visual .orbit {
+        position: absolute; width: 100%; height: 100%; border-radius: 50%;
+        border: 2px dashed rgba(255,255,255,0.8); animation: spin 4s linear infinite;
+    }
+
+    @keyframes pulseGlow { from { transform: scale(0.95); opacity: 0.7; } to { transform: scale(1.05); opacity: 1; } }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    h1.title {
+        font-size: 3.8rem; margin-bottom: 5px; font-weight: 900; letter-spacing: 4px; margin-top:0;
+        background: linear-gradient(45deg, #ffffff, var(--primary-glow), #00aaff);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        text-shadow: 0px 5px 20px rgba(0, 0, 0, 0.9); text-align: center;
+    }
+
+    .score-board {
+        display: flex; gap: 15px; margin-bottom: 25px; margin-top: 10px;
+        background: var(--glass-bg); padding: 12px 25px;
+        border-radius: 20px; border: 1px solid var(--glass-border);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 255, 204, 0.1);
+    }
+    .score-box { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 100px; }
+    .score-box .label { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+    .score-box .value { font-size: 1.6rem; font-weight: 900; color: var(--primary-glow); text-shadow: 0 0 10px rgba(0,255,204,0.5); }
+    .score-divider { width: 1px; background: rgba(255,255,255,0.1); margin: 0 5px; }
+
+    .btn { 
+        background: rgba(0, 0, 0, 0.7); border: 2px solid var(--primary-glow); 
+        padding: 14px 35px; color: white; font-size: 1.2rem; font-weight: bold;
+        border-radius: 30px; cursor: pointer; margin: 8px; transition: all 0.3s ease; 
+        width: 75%; max-width: 300px; box-shadow: 0 0 20px rgba(0,255,204,0.15);
+        text-transform: uppercase; letter-spacing: 1px;
+    }
+    .btn:hover { background: var(--primary-glow); color: #000; box-shadow: 0 0 35px var(--primary-glow); transform: translateY(-3px); }
+
+    #uiLayer { 
+        position: absolute; top: 0; left: 0; right: 0; padding: 15px 20px; 
+        display: flex; justify-content: space-between; align-items: center; z-index: 5; 
+        background: linear-gradient(to bottom, rgba(0,0,0,0.85), transparent);
+        pointer-events: none;
+    }
+    .ui-stats { pointer-events: none; display: flex; gap: 20px;}
+    .ui-text { font-size: 1.2rem; font-weight: 800; text-shadow: 2px 2px 5px #000; color: #fff;}
+    .highlight { color: var(--primary-glow); font-size: 1.4rem; }
+    
+    .exit-btn {
+        background: rgba(255, 50, 50, 0.2); border: 1px solid #ff4444; color: white;
+        padding: 8px 18px; border-radius: 10px; font-weight: bold; cursor: pointer;
+        pointer-events: auto; backdrop-filter: blur(5px); transition: 0.3s;
+    }
+    .exit-btn:hover { background: #ff4444; color: #fff; box-shadow: 0 0 15px #ff4444; }
+
+    .settings-container {
+        width: 95%; max-width: 500px; height: 70vh; overflow-y: auto; padding: 20px; 
+        background: var(--glass-bg); border-radius: 20px; margin-bottom: 15px;
+        border: 1px solid var(--glass-border); box-sizing: border-box;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .settings-category {
+        font-size: 1.2rem; color: var(--primary-glow); border-bottom: 2px solid rgba(0, 255, 204, 0.3);
+        margin-top: 20px; margin-bottom: 15px; padding-bottom: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px;
+    }
+    .setting-item { 
+        display: flex; justify-content: space-between; align-items: center; 
+        font-size: 1rem; margin-bottom: 12px; padding: 12px; 
+        background: rgba(255,255,255,0.03); border-radius: 10px; transition: background 0.2s;
+    }
+    .setting-item:hover { background: rgba(255,255,255,0.08); }
+    .setting-item select { 
+        padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; 
+        background: #1a1a1a; color: var(--primary-glow); outline: none; cursor: pointer; max-width: 50%;
+    }
+
+    .visual-selector-container { margin-bottom: 25px; }
+    .visual-title { font-size: 1.1rem; font-weight: 900; margin-bottom: 12px; color: #fff; text-transform: uppercase; letter-spacing: 1px;}
+    .visual-scroll {
+        display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;
+        scrollbar-width: thin; scrollbar-color: var(--primary-glow) rgba(0,0,0,0.5);
+    }
+    
+    /* Küçük resim kutuları sade temalar için optimize edildi */
+    .thumb-item {
+        flex: 0 0 110px; height: 110px; border-radius: 15px; cursor: pointer;
+        border: 3px solid rgba(255,255,255,0.1); transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+        position: relative; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    .thumb-item:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.5); }
+    .thumb-item.active { border-color: var(--primary-glow); box-shadow: 0 8px 25px rgba(0,255,204,0.6); transform: translateY(-5px); }
+    
+    .thumb-label {
+        position: relative; z-index: 2; width: 100%; text-align: center; padding: 6px 0;
+        font-size: 0.8rem; font-weight: bold; color: #fff; text-shadow: 0 2px 4px #000;
+        background: rgba(0, 0, 0, 0.7); border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    ::-webkit-scrollbar { width: 8px; height: 8px; } 
+    ::-webkit-scrollbar-thumb { background: var(--primary-glow); border-radius: 10px; }
+    ::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="uiLayer" style="display:none;">
+        <div class="ui-stats">
+            <div class="ui-text">Bölüm: <span id="levelVal" class="highlight">1</span></div>
+            <div class="ui-text">Top: <span id="ballVal" class="highlight">1</span></div>
+            <div class="ui-text">Skor: <span id="scoreVal" class="highlight">0</span></div>
+        </div>
+        <button class="exit-btn" onclick="exitToMenu()">✖ Çıkış</button>
+    </div>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="mainMenu" class="screen active">
+    <div class="hero-visual"><div class="orbit"></div></div>
+    <h1 class="title">BOLBALL</h1>
+    
+    <div class="score-board">
+        <div class="score-box">
+            <span class="label">🏆 En Yüksek</span>
+            <span class="value" id="menuHighScore">0</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-box">
+            <span class="label">⭐ Son Skor</span>
+            <span class="value" id="menuLastScore">0</span>
+        </div>
+    </div>
+
+    <button class="btn" onclick="startGame()">▶ OYUNA BAŞLA</button>
+    <button class="btn" onclick="showScreen('settingsMenu')">⚙ AYARLAR & TEMALAR</button>
+</div>
+
+<div id="settingsMenu" class="screen">
+    <h2 style="margin: 15px 0; font-size: 2rem; text-shadow: 0 0 15px var(--primary-glow); letter-spacing: 2px;">ÖZELLEŞTİRME</h2>
+    <div class="settings-container" id="settingsList">
+        <div id="visualSelectors"></div>
+        <div id="dynamicSettings"></div>
+    </div>
+    <button class="btn" onclick="saveSettingsAndReturn()">✓ KAYDET & DÖN</button>
+</div>
+
+<div id="gameOverMenu" class="screen">
+    <h1 class="title" style="color: #ff3333; text-shadow: 0 0 30px #ff0000; font-size: 4rem;">OYUN BİTTİ</h1>
+    <div class="score-board" style="margin-top: 20px;">
+        <div class="score-box">
+            <span class="label">Ulaşılan Bölüm</span>
+            <span class="value" id="finalLevel" style="color:#fff;">0</span>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-box">
+            <span class="label">Kazanılan Skor</span>
+            <span class="value" id="finalScore" style="color:#00ffcc;">0</span>
+        </div>
+    </div>
+    <button class="btn" onclick="startGame()">🔄 YENİDEN BAŞLA</button>
+    <button class="btn" onclick="showScreen('mainMenu')">🏠 ANA MENÜ</button>
+</div>
+
+</div>
+
+<script>
+    let sysHighScore = localStorage.getItem('bolball_highscore') || 0;
+    let sysLastScore = localStorage.getItem('bolball_lastscore') || 0;
+    
+    document.getElementById('menuHighScore').innerText = sysHighScore;
+    document.getElementById('menuLastScore').innerText = sysLastScore;
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Temalar canlı önizleme için 135 derecelik yumuşak gradient formuna getirildi
+    const themes = [
+        {name: "Sade Siyah", bg: "linear-gradient(135deg, #151515, #050505)"},
+        {name: "Koyu Gece", bg: "linear-gradient(135deg, #0f172a, #020617)"},
+        {name: "Zehir", bg: "linear-gradient(135deg, #052e16, #000000)"},
+        {name: "Kızıl Loş", bg: "linear-gradient(135deg, #450a0a, #000000)"},
+        {name: "Mor Derinlik", bg: "linear-gradient(135deg, #2e1065, #000000)"},
+        {name: "Buzul", bg: "linear-gradient(135deg, #0c4a6e, #000000)"},
+        {name: "Siber Matris", bg: "linear-gradient(135deg, #064e3b, #000000)"},
+        {name: "Klasik Gri", bg: "linear-gradient(135deg, #262626, #050505)"}
+    ];
+
+    const ballTypes = [
+        {name:"Beyaz", type:"color", val:"#ffffff"}, {name:"Kırmızı", type:"color", val:"#ff0033"},
+        {name:"Mavi", type:"color", val:"#0066ff"}, {name:"Yeşil", type:"color", val:"#00ff33"},
+        {name:"Sarı", type:"color", val:"#ffcc00"}, {name:"Mor", type:"color", val:"#9900ff"},
+        {name:"Turuncu", type:"color", val:"#ff6600"}, {name:"Camgöbeği", type:"color", val:"#00ffff"},
+        {name:"Pembe", type:"color", val:"#ff00ff"}, {name:"Siyah", type:"color", val:"#222222"},
+        {name:"Altın", type:"color", val:"#ffd700"}, {name:"Futbol", type:"emoji", val:"⚽"}, 
+        {name:"Basket", type:"emoji", val:"🏀"}, {name:"Bilardo", type:"emoji", val:"🎱"}, 
+        {name:"Tenis", type:"emoji", val:"🎾"}, {name:"Dünya", type:"emoji", val:"🌍"}, 
+        {name:"Güneş", type:"emoji", val:"🌞"}, {name:"Elmas", type:"emoji", val:"💎"}, 
+        {name:"Bomba", type:"emoji", val:"💣"}, {name:"Ateş", type:"emoji", val:"🔥"}
+    ];
+
+    const settingsSchema = [
+        { cat: "Görsel Seçenekler", items: [
+            { id: "ballSize", label: "Top Boyutu", type: "select", options: ["Küçük", "Normal", "Büyük"], def: 1 },
+            { id: "blockStyle", label: "Blok Tasarımı", type: "select", options: ["3D Camsı", "Düz & Canlı", "Neon Hatlar"], def: 2 },
+            { id: "showHp", label: "Blok Canını Göster", type: "select", options: ["Açık", "Kapalı"], def: 0 },
+            { id: "gridVisible", label: "Teknolojik Izgara", type: "select", options: ["Kapalı", "Açık"], def: 1 }
+        ]},
+        { cat: "Efektler ve Parçacıklar", items: [
+            { id: "particles", label: "Vuruş Parçacıkları", type: "select", options: ["Kapalı", "Yoğun"], def: 1 },
+            { id: "lightGlow", label: "Dinamik Işıklar (Parlama)", type: "select", options: ["Kapalı", "Açık"], def: 1 },
+            { id: "screenShake", label: "Ekran Titremesi", type: "select", options: ["Kapalı", "Hafif", "Şiddetli"], def: 1 },
+            { id: "trailEffect", label: "Top İzi Efekti", type: "select", options: ["Kapalı", "Kısa", "Uzun"], def: 2 }
+        ]},
+        { cat: "Oynanış", items: [
+            { id: "gameSpeed", label: "Atış Hızı", type: "select", options: ["Yavaş", "Normal", "Hızlı", "Çılgın"], def: 2 },
+            { id: "aimStyle", label: "Nişan Çizgisi", type: "select", options: ["Düz", "Noktalı", "Lazer"], def: 1 },
+            { id: "difficulty", label: "Zorluk", type: "select", options: ["Kolay", "Normal", "Zor"], def: 1 }
+        ]},
+        { cat: "Sistem", items: [
+            { id: "soundFx", label: "Ses Efektleri", type: "select", options: ["Kapalı", "Açık"], def: 1 },
+            { id: "haptic", label: "Titreşim", type: "select", options: ["Kapalı", "Açık"], def: 1 }
+        ]}
+    ];
+
+    let userSettings = { theme: 0, ballStyle: 0 };
+
+    function initSettings() {
+        const visualDiv = document.getElementById('visualSelectors');
+        
+        let themeHTML = `<div class="visual-selector-container"><div class="visual-title">🌌 Arka Plan Teması</div><div class="visual-scroll" id="themeScroll">`;
+        themes.forEach((t, i) => {
+            themeHTML += `<div class="thumb-item ${i === userSettings.theme ? 'active' : ''}" style="background: ${t.bg} !important;" onclick="selectThumb('theme', ${i})">
+                            <div class="thumb-label">${t.name}</div>
+                          </div>`;
+        });
+        themeHTML += `</div></div>`;
+        
+        let ballHTML = `<div class="visual-selector-container"><div class="visual-title">☄️ Top Çeşidi</div><div class="visual-scroll" id="ballScroll">`;
+        ballTypes.forEach((b, i) => {
+            let bgStyle = b.type === 'color' ? `background-color: ${b.val};` : `background-color: #2a2a2a;`;
+            let content = b.type === 'emoji' ? `<span style="z-index:2; font-size: 2rem; position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);">${b.val}</span>` : '';
+            ballHTML += `<div class="thumb-item ${i === userSettings.ballStyle ? 'active' : ''}" style="${bgStyle}" onclick="selectThumb('ballStyle', ${i})">
+                            ${content}<div class="thumb-label">${b.name}</div>
+                         </div>`;
+        });
+        ballHTML += `</div></div>`;
+        
+        visualDiv.innerHTML = themeHTML + ballHTML;
+
+        const dList = document.getElementById('dynamicSettings');
+        dList.innerHTML = "";
+        settingsSchema.forEach(cat => {
+            let catDiv = document.createElement('div');
+            catDiv.className = 'settings-category';
+            catDiv.innerText = cat.cat;
+            dList.appendChild(catDiv);
+
+            cat.items.forEach(item => {
+                if(userSettings[item.id] === undefined) userSettings[item.id] = item.def; 
+                let div = document.createElement('div');
+                div.className = 'setting-item';
+                let html = `<span>${item.label}</span><select id="set_${item.id}">`;
+                item.options.forEach((opt, idx) => { html += `<option value="${idx}" ${idx === userSettings[item.id] ? 'selected' : ''}>${opt}</option>`; });
+                html += `</select>`;
+                div.innerHTML = html;
+                dList.appendChild(div);
+            });
+        });
+    }
+
+    function selectThumb(type, index) {
+        userSettings[type] = index;
+        let container = document.getElementById(type === 'theme' ? 'themeScroll' : 'ballScroll');
+        Array.from(container.children).forEach((child, i) => { child.classList.toggle('active', i === index); });
+        if(type === 'theme') applySettings(); 
+    }
+
+    function saveSettingsAndReturn() {
+        settingsSchema.forEach(cat => {
+            cat.items.forEach(item => { userSettings[item.id] = parseInt(document.getElementById(`set_${item.id}`).value); });
+        });
+        applySettings(); showScreen('mainMenu');
+    }
+
+    function applySettings() {
+        let theme = themes[userSettings.theme];
+        document.getElementById('gameContainer').style.background = theme.bg;
+        resize();
+    }
+
+    // --- OYUN MOTORU ---
+    let gameState = 'menu'; 
+    let level = 1, score = 0;
+    let balls = [], blocks = [], powerUps = [], particles = [], floatTexts = [], activeLasers = [];
+    let isShooting = false, allBallsFired = true, pendingExtraBalls = 0;
+    let shootingInterval;
+    let player = { x: 0, y: 0, ballCount: 1, ballsReady: 1 };
+    
+    let isAiming = false, aimAngle = 0, aimX = 0, aimY = 0;
+    let shakeTime = 0, shakeIntensity = 0;
+    const BOTTOM_OFFSET = 50; 
+
+    let audioCtx = null;
+    function playSound(type) {
+        if(userSettings.soundFx === 0) return;
+        if(!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if(type === 'hit') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(250 + Math.random()*150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'shoot') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+        } else if (type === 'laser') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+        }
+    }
+
+    function vibrate(ms) { if(userSettings.haptic === 1 && navigator.vibrate) navigator.vibrate(ms); }
+
+    function resize() {
+        canvas.width = document.getElementById('gameContainer').clientWidth;
+        canvas.height = document.getElementById('gameContainer').clientHeight;
+        if(player.y === 0 || gameState === 'menu') {
+            player.y = canvas.height - BOTTOM_OFFSET; player.x = canvas.width / 2;
+        }
+    }
+    window.addEventListener('resize', resize);
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (screenId) document.getElementById(screenId).classList.add('active');
+        document.getElementById('uiLayer').style.display = (screenId === '') ? 'flex' : 'none';
+    }
+
+    function exitToMenu() { 
+        saveScores(); 
+        gameState = 'menu'; 
+        clearInterval(shootingInterval); 
+        showScreen('mainMenu'); 
+    }
+
+    function saveScores() {
+        sysLastScore = score;
+        localStorage.setItem('bolball_lastscore', sysLastScore);
+        if(score > sysHighScore) {
+            sysHighScore = score;
+            localStorage.setItem('bolball_highscore', sysHighScore);
+        }
+        document.getElementById('menuHighScore').innerText = sysHighScore;
+        document.getElementById('menuLastScore').innerText = sysLastScore;
+    }
+
+    function startGame() {
+        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        showScreen(''); resize();
+        level = 1; score = 0; player.ballCount = 1; player.ballsReady = 1;
+        player.x = canvas.width / 2; player.y = canvas.height - BOTTOM_OFFSET;
+        pendingExtraBalls = 0; balls = []; blocks = []; powerUps = []; particles = []; floatTexts = []; activeLasers = [];
+        isShooting = false; isAiming = false; allBallsFired = true;
+        updateUI(); generateBlocks();
+        gameState = 'playing'; 
+        if (!window.loopRunning) { window.loopRunning = true; gameLoop(); }
+    }
+
+    function updateUI() {
+        document.getElementById('levelVal').innerText = level;
+        document.getElementById('ballVal').innerText = player.ballsReady + " / " + player.ballCount;
+        document.getElementById('scoreVal').innerText = score;
+    }
+
+    function doScreenShake(amt) { if(userSettings.screenShake === 0) return; shakeIntensity = amt * 1.5; shakeTime = 10; }
+
+    function createParticles(x, y, color, count) {
+        if(userSettings.particles === 0) return;
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
+                life: 1.0, decay: Math.random()*0.05 + 0.02, color: color, size: Math.random()*4 + 1
+            });
+        }
+    }
+    function createFloatText(x, y, text, color) {
+        floatTexts.push({ x: x, y: y, text: text, color: color, life: 1.0 });
+    }
+
+    function generateBlocks() {
+        blocks.forEach(b => b.y += canvas.height * 0.08);
+        powerUps.forEach(p => p.y += canvas.height * 0.08);
+
+        if (blocks.some(b => b.y + b.h > player.y - 10)) {
+            gameState = 'gameover'; 
+            document.getElementById('finalLevel').innerText = level;
+            document.getElementById('finalScore').innerText = score; 
+            saveScores();
+            showScreen('gameOverMenu'); return;
+        }
+
+        const cols = 7; const padding = 8; const w = (canvas.width - (padding * (cols + 1))) / cols; const h = w; 
+        let hpVal = Math.max(1, Math.floor(level * [0.7, 1.0, 1.5][userSettings.difficulty]));
+
+        let rowItems = [];
+        for(let i=0; i<cols; i++) rowItems.push('empty');
+        
+        let extraBallCol = Math.floor(Math.random() * cols);
+        rowItems[extraBallCol] = 'extra_ball';
+
+        for(let i=0; i<cols; i++) {
+            if(rowItems[i] === 'extra_ball') continue;
+            
+            let rand = Math.random();
+            if(rand > 0.4) {
+                rowItems[i] = 'block';
+            } else if (rand < 0.12) {
+                rowItems[i] = Math.random() > 0.5 ? 'laser_v' : 'laser_h';
+            }
+        }
+
+        if (!rowItems.includes('block')) {
+            let emptyCols = rowItems.map((v, i) => v === 'empty' ? i : -1).filter(i => i !== -1);
+            if(emptyCols.length > 0) {
+                rowItems[emptyCols[Math.floor(Math.random() * emptyCols.length)]] = 'block';
+            }
+        }
+
+        for(let i=0; i<cols; i++) {
+            let posX = padding + (i * (w + padding));
+            let type = rowItems[i];
+            
+            if (type === 'block') {
+                blocks.push({ x: posX, y: 80, w: w, h: h, hp: hpVal, maxHp: hpVal, color: `hsl(${(level * 35) % 360}, 90%, 65%)` });
+            } else if (type === 'extra_ball') {
+                powerUps.push({ x: posX + w/2, y: 80 + h/2, r: 14, type: 'extra_ball' });
+            } else if (type === 'laser_v' || type === 'laser_h') {
+                powerUps.push({ x: posX + w/2, y: 80 + h/2, r: 14, type: type });
+            }
+        }
+    }
+
+    function fireLaser(x, y, dir) {
+        playSound('laser'); doScreenShake(15); vibrate(30);
+        activeLasers.push({ x: x, y: y, dir: dir, life: 20 });
+        
+        blocks.forEach(b => {
+            let isHit = false;
+            if(dir === 'v') {
+                if(b.x <= x + 15 && b.x + b.w >= x - 15) isHit = true;
+            } else {
+                if(b.y <= y + 15 && b.y + b.h >= y - 15) isHit = true;
+            }
+            
+            if(isHit) {
+                b.hp = Math.max(0, b.hp - 20);
+                score += 20;
+                createParticles(b.x + b.w/2, b.y + b.h/2, b.color, 15);
+            }
+        });
+        
+        blocks = blocks.filter(b => {
+            if(b.hp <= 0) {
+                createFloatText(b.x + b.w/2, b.y, "+"+(b.maxHp*10), "#0f0");
+                return false;
+            }
+            return true;
+        });
+    }
+
+    function getPointerPos(e) {
+        let rect = canvas.getBoundingClientRect();
+        let x = e.touches ? e.touches[0].clientX : e.clientX;
+        let y = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: x - rect.left, y: y - rect.top };
+    }
+
+    function handlePointerDown(e) {
+        if(gameState !== 'playing' || isShooting) return;
+        isAiming = true; let pos = getPointerPos(e); updateAimAngle(pos.x, pos.y);
+    }
+
+    function handlePointerMove(e) {
+        if(!isAiming) return; e.preventDefault();
+        let pos = getPointerPos(e); updateAimAngle(pos.x, pos.y);
+    }
+
+    function handlePointerUp(e) {
+        if(!isAiming) return; isAiming = false;
+        shootBalls(aimAngle);
+    }
+
+    function updateAimAngle(x, y) {
+        aimX = x; aimY = y;
+        let dx = x - player.x; let dy = player.y - y; 
+        let angle = Math.atan2(dy, dx);
+        if (angle < 0) angle = (dx > 0) ? 0 : Math.PI; 
+        aimAngle = angle;
+    }
+
+    canvas.addEventListener('mousedown', handlePointerDown);
+    canvas.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+    canvas.addEventListener('touchmove', handlePointerMove, {passive: false});
+    window.addEventListener('touchend', handlePointerUp);
+
+    function shootBalls(angle) {
+        isShooting = true; allBallsFired = false; let ballsFired = 0;
+        let spawnRate = [220, 110, 50, 15][userSettings.gameSpeed];
+        let bType = ballTypes[userSettings.ballStyle];
+        let bSize = [4, 7, 10][userSettings.ballSize];
+        let bSpeed = [9, 15, 23, 32][userSettings.gameSpeed];
+
+        shootingInterval = setInterval(() => {
+            if (gameState !== 'playing') { clearInterval(shootingInterval); return; }
+            balls.push({
+                x: player.x, y: player.y - bSize - 2, 
+                vx: Math.cos(angle) * bSpeed, vy: -Math.sin(angle) * bSpeed,
+                r: bSize, typeData: bType, returned: false, trail: [] 
+            });
+            ballsFired++; player.ballsReady--; playSound('shoot'); updateUI();
+            if(ballsFired >= player.ballCount) { clearInterval(shootingInterval); allBallsFired = true; }
+        }, spawnRate);
+    }
+
+    function gameLoop() {
+        if(gameState === 'playing') update();
+        draw(); requestAnimationFrame(gameLoop);
+    }
+
+    function update() {
+        let allBallsReturned = true;
+        if(shakeTime > 0) shakeTime--;
+
+        for(let i=particles.length-1; i>=0; i--) { let p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.life-=p.decay; if(p.life<=0) particles.splice(i,1); }
+        for(let i=floatTexts.length-1; i>=0; i--) { let f=floatTexts[i]; f.y-=1.5; f.life-=0.02; if(f.life<=0) floatTexts.splice(i,1); }
+        for(let i=activeLasers.length-1; i>=0; i--) { activeLasers[i].life--; if(activeLasers[i].life<=0) activeLasers.splice(i,1); }
+
+        balls.forEach(ball => {
+            if (ball.returned) return;
+            allBallsReturned = false;
+
+            if(userSettings.trailEffect > 0) {
+                ball.trail.push({x: ball.x, y: ball.y});
+                if(ball.trail.length > (userSettings.trailEffect === 1 ? 5 : 18)) ball.trail.shift();
+            }
+
+            ball.x += ball.vx; ball.y += ball.vy;
+
+            if (Math.abs(ball.vy) < 0.05) ball.vy += 0.005; 
+
+            if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx *= -1; playSound('hit'); }
+            if (ball.x + ball.r > canvas.width) { ball.x = canvas.width - ball.r; ball.vx *= -1; playSound('hit'); }
+            if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy *= -1; playSound('hit'); } 
+
+            for(let i = blocks.length - 1; i >= 0; i--) {
+                let b = blocks[i];
+                let cX = Math.max(b.x, Math.min(ball.x, b.x + b.w));
+                let cY = Math.max(b.y, Math.min(ball.y, b.y + b.h));
+                let dX = ball.x - cX, dY = ball.y - cY;
+
+                if ((dX * dX) + (dY * dY) < (ball.r * ball.r)) {
+                    if (Math.abs(dX) > Math.abs(dY)) ball.vx *= -1; else ball.vy *= -1;
+                    b.hp--; score += 10; playSound('hit'); vibrate(5);
+                    createParticles(cX, cY, b.color, 10);
+                    
+                    if(b.hp <= 0) {
+                        doScreenShake(5); createFloatText(b.x + b.w/2, b.y, "+"+(b.maxHp*10), "#0f0");
+                        createParticles(b.x + b.w/2, b.y + b.h/2, b.color, 20); blocks.splice(i, 1);
+                    }
+                    updateUI(); break;
+                }
+            }
+
+            for(let i = powerUps.length - 1; i >= 0; i--) {
+                let p = powerUps[i];
+                if(Math.hypot(ball.x - p.x, ball.y - p.y) < ball.r + p.r) {
+                    playSound('hit'); createParticles(p.x, p.y, "#fff", 15);
+                    if(p.type === 'extra_ball') { 
+                        pendingExtraBalls++; 
+                        createFloatText(p.x, p.y, "+1 TOP", "#0ff"); 
+                    }
+                    else if (p.type === 'laser_v') {
+                        createFloatText(p.x, p.y, "DİKEY", "#f0f");
+                        fireLaser(p.x, p.y, 'v');
+                    }
+                    else if (p.type === 'laser_h') {
+                        createFloatText(p.x, p.y, "YATAY", "#f0f");
+                        fireLaser(p.x, p.y, 'h');
+                    }
+                    powerUps.splice(i, 1);
+                }
+            }
+
+            if (ball.vy >= 0 && ball.y + ball.r >= canvas.height - BOTTOM_OFFSET) {
+                ball.returned = true; ball.y = canvas.height - BOTTOM_OFFSET;
+                ball.x = Math.max(ball.r + 5, Math.min(canvas.width - ball.r - 5, ball.x));
+                if(player.ballsReady === 0) player.x = ball.x; 
+                player.ballsReady++; updateUI();
+            }
+        });
+
+        if (isShooting && allBallsFired && allBallsReturned) {
+            isShooting = false; balls = []; level++;
+            player.ballCount += pendingExtraBalls; player.ballsReady = player.ballCount;
+            pendingExtraBalls = 0; updateUI(); generateBlocks();
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        if(shakeTime > 0) ctx.translate((Math.random()-0.5)*shakeIntensity, (Math.random()-0.5)*shakeIntensity);
+        if(gameState !== 'playing') { ctx.restore(); return; }
+
+        if(userSettings.gridVisible === 1) {
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.08)"; ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+            for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+        }
+
+        activeLasers.forEach(l => {
+            ctx.save();
+            ctx.globalAlpha = l.life / 20;
+            let grad;
+            if(l.dir === 'v') {
+                grad = ctx.createLinearGradient(l.x-15, 0, l.x+15, 0);
+                grad.addColorStop(0, "transparent"); grad.addColorStop(0.5, "#ff00ff"); grad.addColorStop(1, "transparent");
+                ctx.fillStyle = grad; ctx.fillRect(l.x - 15, 0, 30, canvas.height);
+                ctx.fillStyle = "#fff"; ctx.fillRect(l.x - 2, 0, 4, canvas.height);
+            } else {
+                grad = ctx.createLinearGradient(0, l.y-15, 0, l.y+15);
+                grad.addColorStop(0, "transparent"); grad.addColorStop(0.5, "#ff00ff"); grad.addColorStop(1, "transparent");
+                ctx.fillStyle = grad; ctx.fillRect(0, l.y - 15, canvas.width, 30);
+                ctx.fillStyle = "#fff"; ctx.fillRect(0, l.y - 2, canvas.width, 4);
+            }
+            ctx.restore();
+        });
+
+        blocks.forEach(block => {
+            ctx.beginPath(); ctx.roundRect(block.x, block.y, block.w, block.h, 8);
+            
+            if(userSettings.blockStyle === 0) { 
+                let grad = ctx.createLinearGradient(block.x, block.y, block.x, block.y + block.h);
+                grad.addColorStop(0, "rgba(255,255,255,0.7)"); grad.addColorStop(0.3, block.color); grad.addColorStop(1, "rgba(0,0,0,0.7)");
+                ctx.fillStyle = grad; ctx.globalAlpha = Math.max(0.4, block.hp / block.maxHp); 
+                ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 5; ctx.fill(); ctx.shadowBlur = 0;
+                ctx.beginPath(); ctx.roundRect(block.x+2, block.y+2, block.w-4, block.h*0.3, 4); 
+                ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fill();
+            } 
+            else if (userSettings.blockStyle === 1) { 
+                ctx.fillStyle = block.color; ctx.globalAlpha = Math.max(0.4, block.hp / block.maxHp);
+                if(userSettings.lightGlow === 1) { ctx.shadowColor = block.color; ctx.shadowBlur = 10; }
+                ctx.fill(); ctx.shadowBlur = 0;
+            } 
+            else { 
+                ctx.fillStyle = "rgba(0, 0, 0, 0.7)"; ctx.fill();
+                ctx.strokeStyle = block.color; ctx.lineWidth = 3;
+                if(userSettings.lightGlow === 1) { ctx.shadowColor = block.color; ctx.shadowBlur = 15; }
+                ctx.stroke(); ctx.shadowBlur = 0;
+            }
+            
+            ctx.globalAlpha = 1.0;
+            if(userSettings.showHp === 0) {
+                ctx.fillStyle = "white"; ctx.font = "bold 18px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.shadowColor = "#000"; ctx.shadowBlur = 4;
+                ctx.fillText(block.hp, block.x + block.w/2, block.y + block.h/2);
+                ctx.shadowBlur = 0;
+            }
+        });
+
+        powerUps.forEach(p => {
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            if(p.type === 'extra_ball') {
+                ctx.fillStyle = "#0ff"; ctx.fill(); ctx.fillStyle = "#000"; ctx.font = "bold 18px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("+", p.x, p.y);
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(Date.now()/150)*4, 0, Math.PI * 2); ctx.strokeStyle = "rgba(0, 255, 204, 0.8)"; ctx.lineWidth = 2; ctx.stroke();
+            } else if (p.type === 'laser_v') {
+                ctx.fillStyle = "#9900ff"; ctx.fill(); ctx.fillStyle = "#fff"; ctx.font = "bold 16px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("↕", p.x, p.y);
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(Date.now()/100)*5, 0, Math.PI * 2); ctx.strokeStyle = "rgba(150, 0, 255, 0.8)"; ctx.lineWidth = 2; ctx.stroke();
+            } else if (p.type === 'laser_h') {
+                ctx.fillStyle = "#9900ff"; ctx.fill(); ctx.fillStyle = "#fff"; ctx.font = "bold 16px Arial"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("↔", p.x, p.y);
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5 + Math.sin(Date.now()/100)*5, 0, Math.PI * 2); ctx.strokeStyle = "rgba(150, 0, 255, 0.8)"; ctx.lineWidth = 2; ctx.stroke();
+            }
+        });
+
+        particles.forEach(p => {
+            ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.color;
+            if(userSettings.lightGlow === 1) { ctx.shadowColor = p.color; ctx.shadowBlur = 15; }
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+        });
+        ctx.globalAlpha = 1.0;
+
+        balls.forEach(ball => {
+            if(ball.returned) return;
+            let tData = ball.typeData;
+            let glowColor = tData.type === 'color' ? tData.val : "#ffffff";
+            
+            if(ball.trail.length > 0) {
+                ctx.beginPath(); ctx.moveTo(ball.trail[0].x, ball.trail[0].y);
+                for(let i=1; i<ball.trail.length; i++) ctx.lineTo(ball.trail[i].x, ball.trail[i].y);
+                ctx.strokeStyle = glowColor; ctx.globalAlpha = 0.3; ctx.lineWidth = ball.r; ctx.stroke(); ctx.globalAlpha = 1.0;
+            }
+            
+            if(userSettings.lightGlow === 1 && tData.type === 'color') { ctx.shadowColor = glowColor; ctx.shadowBlur = 20; }
+            if(tData.type === 'color') {
+                ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2); ctx.fillStyle = tData.val; ctx.fill();
+            } else if (tData.type === 'emoji') {
+                ctx.font = `${ball.r * 2.8}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tData.val, ball.x, ball.y+2);
+            }
+            ctx.shadowBlur = 0;
+        });
+
+        if(isAiming && !isShooting) {
+            let aimLen = 2500;
+            let endX = player.x + Math.cos(aimAngle) * aimLen; let endY = player.y - Math.sin(aimAngle) * aimLen;
+            ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(endX, endY);
+            ctx.strokeStyle = userSettings.aimStyle === 2 ? "rgba(255, 0, 50, 0.8)" : (ballTypes[userSettings.ballStyle].val || "#00ffcc");
+            ctx.lineWidth = userSettings.aimStyle === 2 ? 3 : 2;
+            if(userSettings.aimStyle === 1) ctx.setLineDash([12, 18]); else ctx.setLineDash([]);
+            if(userSettings.lightGlow === 1) { ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 10; }
+            ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
+        }
+
+        ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
+        ctx.beginPath(); ctx.moveTo(0, canvas.height - BOTTOM_OFFSET); ctx.lineTo(canvas.width, canvas.height - BOTTOM_OFFSET); ctx.stroke(); ctx.setLineDash([]);
+
+        ctx.fillStyle = "#fff"; ctx.shadowColor = "var(--primary-glow)"; ctx.shadowBlur = 15;
+        ctx.beginPath(); ctx.arc(player.x, player.y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(player.x - 35, player.y + 12, 70, 8, 4); ctx.fill(); ctx.shadowBlur = 0;
+
+        floatTexts.forEach(f => {
+            ctx.globalAlpha = Math.max(0, f.life); ctx.fillStyle = f.color; ctx.font = "900 22px Arial";
+            ctx.shadowColor = "#000"; ctx.shadowBlur = 5; ctx.textAlign = "center";
+            ctx.fillText(f.text, f.x, f.y); ctx.shadowBlur = 0;
+        });
+        ctx.globalAlpha = 1.0; ctx.restore(); 
+    }
+
+    initSettings(); applySettings(); resize();
+</script>
+
+</body>
+</html>
